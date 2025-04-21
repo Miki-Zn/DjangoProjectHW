@@ -25,7 +25,7 @@ class Task(models.Model):
         ('Done', 'Done'),
     ]
 
-    title = models.CharField(max_length=255, unique=True)
+    title = models.CharField(max_length=255)
     description = models.TextField()
     categories = models.ManyToManyField(Category)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
@@ -54,7 +54,7 @@ class SubTask(models.Model):
         ('Done', 'Done'),
     ]
 
-    title = models.CharField(max_length=255, unique=True)
+    title = models.CharField(max_length=255)
     description = models.TextField()
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='subtasks')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
