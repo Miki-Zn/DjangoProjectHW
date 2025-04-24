@@ -1,9 +1,12 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.generics import ListAPIView
+from rest_framework.pagination import PageNumberPagination
 from django.utils.timezone import now
 from django.http import HttpResponse
 from django.db import models
+import calendar
 
 from .models import Task, SubTask
 from .serializers import (
@@ -49,6 +52,50 @@ class TaskStatsView(APIView):
         })
 
 
+class TaskByDayView(APIView):
+    def get(self, request):
+        day_param = request.query_params.get('day')
+        tasks = Task.objects.all()
+
+        if day_param:
+            try:
+                day_index = list(calendar.day_name).index(day_param.capitalize())
+                tasks = tasks.filter(deadline__week_day=(day_index + 2) % 7 or 7)
+            except ValueError:
+                return Response({"error": "Invalid day"}, status=400)
+
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+
+# ==== SubTask Views ====
+
+class SubTaskPagination(PageNumberPagination):
+    page_size = 5
+
+
+class FilteredSubTaskView(ListAPIView):
+    serializer_class = SubTaskSerializer
+    pagination_class = SubTaskPagination
+
+    def get_queryset(self):
+        queryset = SubTask.objects.all().order_by('-created_at')
+        task_name = self.request.query_params.get('task_name')
+        status = self.request.query_params.get('status')
+
+        if task_name:
+            queryset = queryset.filter(task__title__icontains=task_name)
+        if status:
+            queryset = queryset.filter(status=status)
+
+        return queryset
+
+
+class SubTaskListView(ListAPIView):
+    queryset = SubTask.objects.all().order_by('-created_at')
+    serializer_class = SubTaskSerializer
+    pagination_class = SubTaskPagination
+
 
 class SubTaskListCreateView(generics.ListCreateAPIView):
     queryset = SubTask.objects.all()
@@ -63,3 +110,19 @@ class SubTaskDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
     lookup_field = 'id'
+
+class SubTaskPaginatedListView(ListAPIView):
+    serializer_class = SubTaskSerializer
+    pagination_class = SubTaskPagination
+
+    def get_queryset(self):
+        queryset = SubTask.objects.all().order_by('-created_at')
+        task_name = self.request.query_params.get('task_name')
+        status = self.request.query_params.get('status')
+
+        if task_name:
+            queryset = queryset.filter(task__title__icontains=task_name)
+        if status:
+            queryset = queryset.filter(status=status)
+
+        return queryset

@@ -53,6 +53,8 @@ class TaskCreateSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    categories = serializers.StringRelatedField(many=True)
+
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'status', 'deadline', 'created_at']
+        fields = ['id', 'title', 'description', 'status', 'deadline', 'created_at', 'categories']
