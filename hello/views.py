@@ -1,6 +1,7 @@
-from rest_framework import generics, status, filters
+from rest_framework import generics, filters, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from django.utils.timezone import now
 from django.http import HttpResponse
 from django.db import models
@@ -19,7 +20,6 @@ from .serializers import (
 
 def greeting(request):
     return HttpResponse("Привет!")
-
 
 
 class TaskListCreateView(generics.ListCreateAPIView):
@@ -56,18 +56,27 @@ class TaskStatsView(APIView):
 
 class TaskByDayView(APIView):
     def get(self, request):
-        day_param = request.query_params.get('day')
-        tasks = Task.objects.all()
+        day_param = request.query_params.get('day', '').strip()
+        valid_days = [d.lower() for d in calendar.day_name]
 
         if day_param:
-            try:
-                day_index = list(calendar.day_name).index(day_param.capitalize())
-                tasks = tasks.filter(deadline__week_day=(day_index + 2) % 7 or 7)
-            except ValueError:
-                return Response({"error": "Invalid day"}, status=400)
+            day_lower = day_param.lower()
+            if day_lower not in valid_days:
+                return Response({"error": "Invalid day"}, status=status.HTTP_400_BAD_REQUEST)
+            day_index = valid_days.index(day_lower)
+            tasks = Task.objects.filter(deadline__week_day=(day_index + 2) % 7 or 7)
+        else:
+            tasks = Task.objects.all()
 
         serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_query_param = 'page'
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class SubTaskListCreateView(generics.ListCreateAPIView):
@@ -88,3 +97,24 @@ class SubTaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
     lookup_field = 'id'
+
+
+class SubTaskPaginatedListView(generics.ListAPIView):
+    queryset = SubTask.objects.all()
+    serializer_class = SubTaskSerializer
+    pagination_class = StandardResultsSetPagination
+
+
+class SubTaskFilterView(APIView):
+    def get(self, request):
+        queryset = SubTask.objects.all()
+        task_name = request.query_params.get('task_name')
+        status_param = request.query_params.get('status')
+
+        if task_name:
+            queryset = queryset.filter(task__title__icontains=task_name)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        serializer = SubTaskSerializer(queryset, many=True)
+        return Response(serializer.data)

@@ -27,7 +27,7 @@ class Task(models.Model):
 
 class SubTask(models.Model):
     title = models.CharField(max_length=200)
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=50)
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)

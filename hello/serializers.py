@@ -4,10 +4,19 @@ from django.utils import timezone
 
 
 class SubTaskCreateSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(required=False, allow_blank=True)
+    deadline = serializers.DateField(required=False, allow_null=True)
+
     class Meta:
         model = SubTask
         fields = '__all__'
         read_only_fields = ['created_at']
+
+
+class SubTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubTask
+        fields = '__all__'
 
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
@@ -19,18 +28,6 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
         if Category.objects.filter(name=value).exclude(pk=self.instance.pk if self.instance else None).exists():
             raise serializers.ValidationError("Категория с таким названием уже существует.")
         return value
-
-    def create(self, validated_data):
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        return super().update(instance, validated_data)
-
-
-class SubTaskSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SubTask
-        fields = '__all__'
 
 
 class TaskDetailSerializer(serializers.ModelSerializer):
@@ -47,7 +44,8 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate_deadline(self, value):
-        if value and value < timezone.now().date():
+        now = timezone.now().date()
+        if value and value < now:
             raise serializers.ValidationError("Дедлайн не может быть в прошлом.")
         return value
 
