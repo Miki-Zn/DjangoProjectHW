@@ -26,15 +26,19 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         if Category.objects.filter(name=value).exclude(pk=self.instance.pk if self.instance else None).exists():
-            raise serializers.ValidationError("Категория с таким названием уже существует.")
+            raise serializers.ValidationError("A category with this name already exists.")
         return value
 
 
-class TaskDetailSerializer(serializers.ModelSerializer):
-    subtasks = SubTaskSerializer(source='subtask_set', many=True, read_only=True)
-
+class CategoryDetailSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Task
+        model = Category
+        fields = '__all__'
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
         fields = '__all__'
 
 
@@ -46,8 +50,16 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     def validate_deadline(self, value):
         now = timezone.now().date()
         if value and value < now:
-            raise serializers.ValidationError("Дедлайн не может быть в прошлом.")
+            raise serializers.ValidationError("Deadline cannot be in the past.")
         return value
+
+
+class TaskDetailSerializer(serializers.ModelSerializer):
+    subtasks = SubTaskSerializer(source='subtask_set', many=True, read_only=True)
+
+    class Meta:
+        model = Task
+        fields = '__all__'
 
 
 class TaskSerializer(serializers.ModelSerializer):

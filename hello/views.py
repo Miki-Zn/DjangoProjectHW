@@ -1,6 +1,7 @@
-from rest_framework import generics, filters, status
+from rest_framework import generics, filters, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from django.utils.timezone import now
 from django.http import HttpResponse
@@ -8,18 +9,20 @@ from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 import calendar
 
-from .models import Task, SubTask
+from .models import Task, SubTask, Category
 from .serializers import (
     TaskSerializer,
     TaskDetailSerializer,
     TaskCreateSerializer,
     SubTaskCreateSerializer,
-    SubTaskSerializer
+    SubTaskSerializer,
+    CategorySerializer,
+    CategoryDetailSerializer
 )
 
 
 def greeting(request):
-    return HttpResponse("Привет!")
+    return HttpResponse("Hello!")
 
 
 class TaskListCreateView(generics.ListCreateAPIView):
@@ -118,3 +121,24 @@ class SubTaskFilterView(APIView):
 
         serializer = SubTaskSerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['name']
+    ordering = ['name']
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'])
+    def count_tasks(self, request, pk=None):
+        category = self.get_object()
+        tasks_count = category.task_set.count()
+        return Response({'tasks_count': tasks_count})
