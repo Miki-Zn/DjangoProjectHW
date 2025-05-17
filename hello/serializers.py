@@ -43,6 +43,11 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class TaskCreateSerializer(serializers.ModelSerializer):
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Category.objects.all()
+    )
+
     class Meta:
         model = Task
         fields = '__all__'
@@ -52,6 +57,7 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         if value and value < now:
             raise serializers.ValidationError("Deadline cannot be in the past.")
         return value
+
 
 
 class TaskDetailSerializer(serializers.ModelSerializer):

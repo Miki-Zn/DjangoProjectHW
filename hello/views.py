@@ -2,12 +2,13 @@ from rest_framework import generics, filters, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from django.utils.timezone import now
 from django.http import HttpResponse
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 import calendar
+from rest_framework.exceptions import ValidationError
 
 from .models import Task, SubTask, Category
 from .serializers import (
@@ -27,6 +28,7 @@ def greeting(request):
 
 class TaskListCreateView(generics.ListCreateAPIView):
     queryset = Task.objects.all()
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'deadline']
     search_fields = ['title', 'description']
@@ -38,14 +40,33 @@ class TaskListCreateView(generics.ListCreateAPIView):
             return TaskCreateSerializer
         return TaskSerializer
 
+    from rest_framework.exceptions import ValidationError
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+        except ValidationError as e:
+            print("VALIDATION ERROR:", e.detail)
+            return Response({'validation_error': e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print("GENERAL ERROR:", str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class TaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskDetailSerializer
     lookup_field = 'id'
+    permission_classes = [IsAuthenticated]
 
 
 class TaskStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         total_tasks = Task.objects.count()
         status_counts = Task.objects.values('status').annotate(count=models.Count('status'))
@@ -58,6 +79,8 @@ class TaskStatsView(APIView):
 
 
 class TaskByDayView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         day_param = request.query_params.get('day', '').strip()
         valid_days = [d.lower() for d in calendar.day_name]
@@ -75,15 +98,9 @@ class TaskByDayView(APIView):
         return Response(serializer.data)
 
 
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 10
-    page_query_param = 'page'
-    page_size_query_param = 'page_size'
-    max_page_size = 100
-
-
 class SubTaskListCreateView(generics.ListCreateAPIView):
     queryset = SubTask.objects.all()
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'deadline']
     search_fields = ['title', 'description']
@@ -100,15 +117,18 @@ class SubTaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
     lookup_field = 'id'
+    permission_classes = [IsAuthenticated]
 
 
 class SubTaskPaginatedListView(generics.ListAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
-    pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticated]
 
 
 class SubTaskFilterView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         queryset = SubTask.objects.all()
         task_name = request.query_params.get('task_name')
@@ -123,10 +143,10 @@ class SubTaskFilterView(APIView):
         return Response(serializer.data)
 
 
-
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
     ordering_fields = ['name']
@@ -137,7 +157,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def count_tasks(self, request, pk=None):
         category = self.get_object()
         tasks_count = category.task_set.count()
