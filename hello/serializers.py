@@ -6,6 +6,7 @@ from django.utils import timezone
 class SubTaskCreateSerializer(serializers.ModelSerializer):
     description = serializers.CharField(required=False, allow_blank=True)
     deadline = serializers.DateField(required=False, allow_null=True)
+    owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = SubTask
@@ -14,6 +15,7 @@ class SubTaskCreateSerializer(serializers.ModelSerializer):
 
 
 class SubTaskSerializer(serializers.ModelSerializer):
+    owner = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = SubTask
         fields = '__all__'
@@ -47,6 +49,7 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         many=True,
         queryset=Category.objects.all()
     )
+    owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = Task
@@ -59,9 +62,9 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         return value
 
 
-
 class TaskDetailSerializer(serializers.ModelSerializer):
     subtasks = SubTaskSerializer(source='subtask_set', many=True, read_only=True)
+    owner = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Task
@@ -70,7 +73,8 @@ class TaskDetailSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
     categories = serializers.StringRelatedField(many=True)
+    owner = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'status', 'deadline', 'created_at', 'categories']
+        fields = ['id', 'title', 'description', 'status', 'deadline', 'created_at', 'categories', 'owner']

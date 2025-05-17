@@ -1,14 +1,11 @@
 from rest_framework import generics, filters, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from django.utils.timezone import now
-from django.http import HttpResponse
-from django.db import models
+from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
-import calendar
-from rest_framework.exceptions import ValidationError
+
+
 
 from .models import Task, SubTask, Category
 from .serializers import (
@@ -17,17 +14,39 @@ from .serializers import (
     TaskCreateSerializer,
     SubTaskCreateSerializer,
     SubTaskSerializer,
-    CategorySerializer,
-    CategoryDetailSerializer
+    CategorySerializer
 )
+from .permissions import IsOwnerOrReadOnly
 
 
-def greeting(request):
-    return HttpResponse("Hello!")
+class TaskStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        total_tasks = Task.objects.filter(owner=user).count()
+        completed_tasks = Task.objects.filter(owner=user, status='completed').count()  # пример
+        return Response({
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks,
+        })
+
+    class TaskByDayView(APIView):
+        permission_classes = [IsAuthenticated]
+
+        def get(self, request):
+            user = request.user
+            tasks_by_day = (
+                Task.objects.filter(owner=user)
+                .annotate(day=TruncDate('created_at'))
+                .values('day')
+                .annotate(count=Count('id'))
+                .order_by('day')
+            )
+            return Response(tasks_by_day)
 
 
 class TaskListCreateView(generics.ListCreateAPIView):
-    queryset = Task.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'deadline']
@@ -40,66 +59,23 @@ class TaskListCreateView(generics.ListCreateAPIView):
             return TaskCreateSerializer
         return TaskSerializer
 
-    from rest_framework.exceptions import ValidationError
+    def get_queryset(self):
+        return Task.objects.filter(owner=self.request.user)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-        except ValidationError as e:
-            print("VALIDATION ERROR:", e.detail)
-            return Response({'validation_error': e.detail}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            print("GENERAL ERROR:", str(e))
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class TaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Task.objects.all()
     serializer_class = TaskDetailSerializer
     lookup_field = 'id'
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
 
-
-class TaskStatsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        total_tasks = Task.objects.count()
-        status_counts = Task.objects.values('status').annotate(count=models.Count('status'))
-        overdue_tasks = Task.objects.filter(deadline__lt=now()).count()
-        return Response({
-            'total_tasks': total_tasks,
-            'status_counts': status_counts,
-            'overdue_tasks': overdue_tasks
-        })
-
-
-class TaskByDayView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        day_param = request.query_params.get('day', '').strip()
-        valid_days = [d.lower() for d in calendar.day_name]
-
-        if day_param:
-            day_lower = day_param.lower()
-            if day_lower not in valid_days:
-                return Response({"error": "Invalid day"}, status=status.HTTP_400_BAD_REQUEST)
-            day_index = valid_days.index(day_lower)
-            tasks = Task.objects.filter(deadline__week_day=(day_index + 2) % 7 or 7)
-        else:
-            tasks = Task.objects.all()
-
-        serializer = TaskSerializer(tasks, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return Task.objects.filter(owner=self.request.user)
 
 
 class SubTaskListCreateView(generics.ListCreateAPIView):
-    queryset = SubTask.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'deadline']
@@ -112,35 +88,20 @@ class SubTaskListCreateView(generics.ListCreateAPIView):
             return SubTaskCreateSerializer
         return SubTaskSerializer
 
+    def get_queryset(self):
+        return SubTask.objects.filter(owner=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
 
 class SubTaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
     lookup_field = 'id'
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
 
-
-class SubTaskPaginatedListView(generics.ListAPIView):
-    queryset = SubTask.objects.all()
-    serializer_class = SubTaskSerializer
-    permission_classes = [IsAuthenticated]
-
-
-class SubTaskFilterView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        queryset = SubTask.objects.all()
-        task_name = request.query_params.get('task_name')
-        status_param = request.query_params.get('status')
-
-        if task_name:
-            queryset = queryset.filter(task__title__icontains=task_name)
-        if status_param:
-            queryset = queryset.filter(status=status_param)
-
-        serializer = SubTaskSerializer(queryset, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return SubTask.objects.filter(owner=self.request.user)
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -160,5 +121,5 @@ class CategoryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def count_tasks(self, request, pk=None):
         category = self.get_object()
-        tasks_count = category.task_set.count()
+        tasks_count = category.task_set.filter(owner=request.user).count()
         return Response({'tasks_count': tasks_count})
