@@ -4,34 +4,36 @@ from .views import (
     TaskListCreateView,
     TaskRetrieveUpdateDestroyView,
     TaskStatsView,
-    # TaskByDayView,
+    TaskByDayView,
     SubTaskListCreateView,
     SubTaskRetrieveUpdateDestroyView,
-    # SubTaskPaginatedListView,
-    # SubTaskFilterView,
     CategoryViewSet,
 )
 
+from django.http import HttpResponse
 
 def greeting(request):
-    from django.http import HttpResponse
     return HttpResponse("Hello, this is greeting view.")
+
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 
+
 urlpatterns = [
-    path('', greeting, name='greeting'),
 
     path('tasks/', TaskListCreateView.as_view(), name='task-list-create'),
     path('tasks/<int:id>/', TaskRetrieveUpdateDestroyView.as_view(), name='task-retrieve-update-destroy'),
     path('tasks/stats/', TaskStatsView.as_view(), name='task-stats'),
-    # path('tasks/by-day/', TaskByDayView.as_view(), name='task-by-day'),
+    path('tasks/by-day/', TaskByDayView.as_view(), name='task-by-day'),
+
 
     path('subtasks/', SubTaskListCreateView.as_view(), name='subtask-list-create'),
-    # path('subtasks/paginated/', SubTaskPaginatedListView.as_view(), name='subtask-paginated'),
-    # path('subtasks/filter/', SubTaskFilterView.as_view(), name='subtask-filter'),
     path('subtasks/<int:id>/', SubTaskRetrieveUpdateDestroyView.as_view(), name='subtask-retrieve-update-destroy'),
 
+
     path('', include(router.urls)),
+
+
+    path('', greeting, name='greeting'),
 ]

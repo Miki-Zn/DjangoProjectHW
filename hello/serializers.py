@@ -11,14 +11,21 @@ class SubTaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubTask
         fields = '__all__'
-        read_only_fields = ['created_at']
+        read_only_fields = ['created_at', 'id']
+
+    def validate_deadline(self, value):
+        if value and value < timezone.now().date():
+            raise serializers.ValidationError("Deadline cannot be in the past.")
+        return value
 
 
 class SubTaskSerializer(serializers.ModelSerializer):
     owner = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = SubTask
         fields = '__all__'
+        read_only_fields = ['id', 'created_at']
 
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
@@ -36,12 +43,14 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = '__all__'
+        read_only_fields = ['id']
 
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = '__all__'
+        read_only_fields = ['id']
 
 
 class TaskCreateSerializer(serializers.ModelSerializer):
@@ -54,10 +63,10 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = '__all__'
+        read_only_fields = ['created_at', 'id']
 
     def validate_deadline(self, value):
-        now = timezone.now().date()
-        if value and value < now:
+        if value and value < timezone.now().date():
             raise serializers.ValidationError("Deadline cannot be in the past.")
         return value
 
@@ -65,14 +74,16 @@ class TaskCreateSerializer(serializers.ModelSerializer):
 class TaskDetailSerializer(serializers.ModelSerializer):
     subtasks = SubTaskSerializer(source='subtask_set', many=True, read_only=True)
     owner = serializers.StringRelatedField(read_only=True)
+    categories = CategorySerializer(many=True)
 
     class Meta:
         model = Task
         fields = '__all__'
+        read_only_fields = ['id', 'created_at']
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    categories = serializers.StringRelatedField(many=True)
+    categories = CategorySerializer(many=True)
     owner = serializers.StringRelatedField(read_only=True)
 
     class Meta:
