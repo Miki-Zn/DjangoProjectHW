@@ -32,7 +32,7 @@ class Task(models.Model):
         ('completed', 'Completed'),
     ]
 
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE,related_name='tasks', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField()
     status = models.CharField(max_length=50, choices=STATUS_CHOICES)
